@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Araba Oyunu - Çarpma Etkisi</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #speed-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 18px;
+            z-index: 10;
+        }
+        #vites, #vites2 {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            font-size: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .control-button {
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            margin: 0 10px;
+            user-select: none; 
+            border-radius: 5px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 5%;
+            left: 5%;
+            display: flex;
+            z-index: 10;
+            user-select: none; 
+        }
+        #controls-2 {
+            position: absolute;
+            bottom: 5%;
+            right: 5%;
+            display: flex;
+            z-index: 10;
+        }
+        #forward {
+            background-image: url('https://r.resimlink.com/PKsBuX5Sy_2e.png');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        #brake {
+            background-image: url('https://r.resimlink.com/Ij3nQKeqyXxA.png');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        #left, #right {
+            font-size: 24px;
+            border-radius: 30px;
+        }
+   
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+   
+</head>
+<body>
+    <div id="speed-display">Hız: 0 km/h</div>
+    <button id="vites" onclick="changeVitesR()">D</button>
+    <button id="vites2" style="display: none" onclick="changeVitesD()">R</button>
+    <div id="controls-2">    
+        <button id="forward" class="control-button"></button>
+        <button id="brake" class="control-button"></button>
+    </div>
+    <div id="controls">
+        <button id="left" class="control-button">←</button>
+        <button id="right" class="control-button">→</button>
+    </div>
+    <div id="collision-message"></div>
+
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000);
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0x404040, 5.1);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0x000000, 0.0);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(100, 100),
+            new THREE.MeshStandardMaterial({ color: 0x3A5F0B, roughness: 0.8, metalness: 0.2 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        const road = new THREE.Mesh(
+            new THREE.PlaneGeometry(20, 1004),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+        );
+        road.rotation.x = -Math.PI / 2;
+        road.position.y = 0.01;
+        scene.add(road);
+
+        for (let i = -100; i < 150; i += 5) {
+            const line = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.5, 2),
+                new THREE.MeshStandardMaterial({ color: 0xffff00 })
+            );
+            line.rotation.x = -Math.PI / 2;
+            line.position.set(0, 0.02, i);
+            scene.add(line);
+        }
+        
+     
+        
+
+        const loader = new THREE.GLTFLoader();
+        let car;
+        loader.load('Assets/cars/508.gltf', (gltf) => {
+            car = gltf.scene;
+            car.position.set(-3, 2, -3);
+            car.scale.set(0.2, 0.2, 0.2);
+            scene.add(car);
+        }, undefined, (error) => {
+            console.error('Car model could not be loaded:', error);
+        });
+
+        const cityLoader = new THREE.GLTFLoader();
+        cityLoader.load('Assets/map.gltf', (gltf) => {
+            const city = gltf.scene;
+            city.position.set(0, -1, 0);
+            scene.add(city);
+        });
+
+        camera.position.set(0, 3, -5);
+        camera.lookAt(0, 1, 0);
+
+        const vites = document.getElementById('vites');
+        const vites2 = document.getElementById('vites2');
+        let currentGear = 'D';
+
+        function changeVitesR() {
+            currentGear = 'R';
+            vites.style.display = 'none';
+            vites2.style.display = 'block';
+        }
+        function changeVitesD() {
+            currentGear = 'D';
+            vites.style.display = 'block';
+            vites2.style.display = 'none';
+        }
+
+        const controls = { forward: false, backward: false, left: false, right: false, brake: false };
+        const carPhysics = {
+            speed: 0,
+            maxSpeed: 5.900,
+            acceleration: 0.01,
+            deceleration: 0.001,
+            turnSpeed: 0.03,
+            rotation: 0,
+            direction: new THREE.Vector3(0, 0, 0)
+        };
+
+        // Çarpışma bariyeri (görünmez)
+        // Yolun sonunda bir bariyer oluşturalım, çarptığında araba dursun
+        const barrierGeometry = new THREE.BoxGeometry(20, 5, 2);
+        const barrierMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff, transparent: true, opacity: 0.0 });
+        const barrier = new THREE.Mesh(barrierGeometry, barrierMaterial);
+        barrier.position.set(0, 2.5, 50); // Yolun 50 birim ilerisine yerleştirin
+        scene.add(barrier);
+
+        const collisionMessage = document.getElementById('collision-message');
+        let collisionTimer = null;
+
+        window.addEventListener('keydown', (e) => {
+            switch (e.key.toLowerCase()) {
+                case 'w': controls.forward = true; break;
+                case 's': controls.brake = true; break;
+                case 'a': controls.left = true; break;
+                case 'd': controls.right = true; break;
+                case '1': changeVitesR(); break; 
+                case '2': changeVitesD(); break; 
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            switch (e.key.toLowerCase()) {
+                case 'w': controls.forward = false; break;
+                case 's': controls.brake = false; break;
+                case 'a': controls.left = false; break;
+                case 'd': controls.right = false; break;
+                case ' ': controls.brake = false; break;
+            }
+        });
+
+        document.getElementById('forward').addEventListener('touchstart', () => controls.forward = true);
+        document.getElementById('forward').addEventListener('touchend', () => controls.forward = false);
+        document.getElementById('brake').addEventListener('touchstart', () => controls.brake = true);
+        document.getElementById('brake').addEventListener('touchend', () => controls.brake = false);
+        document.getElementById('left').addEventListener('touchstart', () => controls.left = true);
+        document.getElementById('left').addEventListener('touchend', () => controls.left = false);
+        document.getElementById('right').addEventListener('touchstart', () => controls.right = true);
+        document.getElementById('right').addEventListener('touchend', () => controls.right = false);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (car) {
+                // Car movement logic
+                // Eğer araba durmamışsa (çarpışma anında hız sıfırlanacak)
+                if (carPhysics.speed !== 0 || controls.forward || controls.brake || controls.left || controls.right) {
+                    if (controls.forward) {
+                        if (currentGear === 'D') {
+                            carPhysics.speed = Math.min(carPhysics.speed + carPhysics.acceleration, carPhysics.maxSpeed);
+                        } else if (currentGear === 'R') {
+                            carPhysics.speed = Math.max(carPhysics.speed - carPhysics.acceleration, -carPhysics.maxSpeed * 0.5);
+                        }
+                    } else {
+                        if (carPhysics.speed !== 0) {
+                            carPhysics.speed = carPhysics.speed > 0
+                                ? Math.max(carPhysics.speed - carPhysics.deceleration, 0)
+                                : Math.min(carPhysics.speed + carPhysics.deceleration, 0);
+                        }
+                    }
+
+                    if (controls.brake) {
+                        carPhysics.speed *= 0.9;
+                    }
+
+                    if (Math.abs(carPhysics.speed) > 0.01) {
+                        if (controls.left) carPhysics.rotation += carPhysics.turnSpeed * Math.sign(carPhysics.speed);
+                        if (controls.right) carPhysics.rotation -= carPhysics.turnSpeed * Math.sign(carPhysics.speed);
+                    }
+
+                    car.rotation.y = carPhysics.rotation;
+                    carPhysics.direction.set(Math.sin(carPhysics.rotation), 0, Math.cos(carPhysics.rotation));
+                    car.position.add(carPhysics.direction.clone().multiplyScalar(carPhysics.speed));
+                }
+
+
+                // Basit çarpışma tespiti (Araba ile görünmez bariyer arasında)
+                const carBoundingBox = new THREE.Box3().setFromObject(car);
+                const barrierBoundingBox = new THREE.Box3().setFromObject(barrier);
+
+                if (carBoundingBox.intersectsBox(barrierBoundingBox)) {
+                    // Çarpışma tespit edildi!
+                    // Aracın hızını tamamen sıfırla, böylece durur
+                    carPhysics.speed = 0;
+                    // Aracı, çarptığı yerden hafifçe geri iterek bariyerin içine girmesini engelle
+                    car.position.sub(carPhysics.direction.clone().multiplyScalar(1)); // 1 birim geri it
+
+                    collisionMessage.style.display = 'block'; // Çarpışma mesajını göster
+
+                    if (collisionTimer) {
+                        clearTimeout(collisionTimer); // Önceki zamanlayıcıyı temizle
+                    }
+                    collisionTimer = setTimeout(() => {
+                        collisionMessage.style.display = 'none'; // 1 saniye sonra gizle
+                        collisionTimer = null; // Zamanlayıcıyı sıfırla
+                    }, 1000);
+                } else {
+                    // Çarpışma yoksa ve mesaj hala görünüyorsa, gizle (zamanlayıcı aktif değilse)
+                    if (collisionMessage.style.display === 'block' && collisionTimer === null) {
+                         collisionMessage.style.display = 'none';
+                    }
+                }
+
+                // Kamera takibi
+                const camOffset = new THREE.Vector3(
+                    Math.sin(carPhysics.rotation) * -5,
+                    3,
+                    Math.cos(carPhysics.rotation) * -5
+                );
+                camera.position.copy(car.position.clone().add(camOffset));
+                camera.lookAt(car.position);
+
+                document.getElementById('speed-display').textContent =
+                    `Hız: ${Math.abs(Math.round(carPhysics.speed * 100))} km/h`;
+            }
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
